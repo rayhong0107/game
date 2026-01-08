@@ -1,0 +1,673 @@
+<!--
+如何遊玩：按下「開始」後，30 秒內點擊冒出來的地鼠得分。時間到自動結算。可隨時切換難度調整地鼠速度。
+檔案結構：單一檔案 index.html（包含 CSS + JS，離線可直接開啟遊玩）。
+-->
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>卡通打地鼠</title>
+  <style>
+    :root {
+      --ink: #2b2b2b;
+      --pink: #ff7ab5;
+      --orange: #ffb347;
+      --yellow: #ffe066;
+      --mint: #7ae7c7;
+      --blue: #8fd3ff;
+      --purple: #b39bff;
+      --card: #fff7ea;
+      --hole: #c58b5b;
+      --hole-dark: #8b5a3c;
+      --mole: #cfa37a;
+      --mole-dark: #8a5a3b;
+      --shadow: 0 6px 0 rgba(0,0,0,0.2);
+      --sticker-shadow: 0 6px 0 rgba(0,0,0,0.25), 0 10px 16px rgba(0,0,0,0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Arial Rounded MT Bold", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #fff8f1 0%, #ffe8f6 35%, #d6f6ff 100%);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,0.6) 12%, transparent 13%),
+        radial-gradient(circle, rgba(255,255,255,0.5) 10%, transparent 11%);
+      background-size: 120px 120px, 180px 180px;
+      background-position: 20px 30px, 80px 100px;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .game-shell {
+      width: min(920px, 95vw);
+      background: var(--card);
+      border: 4px solid var(--ink);
+      border-radius: 28px;
+      box-shadow: var(--sticker-shadow);
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .title {
+      text-align: center;
+      font-size: clamp(28px, 4vw, 44px);
+      margin: 0 0 18px;
+      color: #ff5a96;
+      text-shadow: 3px 3px 0 var(--ink);
+      letter-spacing: 2px;
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .hud-card {
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-radius: 18px;
+      padding: 10px 14px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .hud-card span {
+      display: block;
+      font-size: 22px;
+      color: #ff7a00;
+      text-shadow: 2px 2px 0 #fff1d6;
+      margin-top: 4px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .slider-wrap {
+      background: var(--purple);
+      border: 4px solid var(--ink);
+      border-radius: 20px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    .slider-wrap input[type="range"] {
+      accent-color: #ff6fb1;
+    }
+
+    .button {
+      background: var(--mint);
+      border: 4px solid var(--ink);
+      border-radius: 20px;
+      padding: 12px 22px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+
+    .button:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.25);
+    }
+
+    .select-wrap {
+      background: var(--yellow);
+      border: 4px solid var(--ink);
+      border-radius: 20px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    select {
+      border: 3px solid var(--ink);
+      border-radius: 12px;
+      padding: 6px 10px;
+      font-size: 16px;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 0 auto 20px;
+      max-width: 520px;
+    }
+
+    .hole {
+      background: var(--hole);
+      border: 4px solid var(--ink);
+      border-radius: 22px;
+      padding-top: 100%;
+      position: relative;
+      box-shadow: inset 0 -10px 0 var(--hole-dark), var(--shadow);
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .hole.flash {
+      animation: hole-bounce 0.2s ease;
+    }
+
+    @keyframes hole-bounce {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0); }
+    }
+
+    .mole {
+      position: absolute;
+      left: 50%;
+      bottom: -8px;
+      width: 70%;
+      height: 70%;
+      transform: translateX(-50%) scale(0.6);
+      background: var(--mole);
+      border: 4px solid var(--ink);
+      border-radius: 50% 50% 45% 45%;
+      box-shadow: inset 0 -8px 0 var(--mole-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .mole.show {
+      opacity: 1;
+      animation: pop 0.25s ease-out forwards;
+    }
+
+    @keyframes pop {
+      0% { transform: translateX(-50%) translateY(25%) scale(0.5); }
+      70% { transform: translateX(-50%) translateY(-8%) scale(1.05); }
+      100% { transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    .face {
+      position: relative;
+      width: 68%;
+      height: 68%;
+      background: #f6d2a4;
+      border: 3px solid var(--ink);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .eye {
+      width: 10px;
+      height: 16px;
+      background: var(--ink);
+      border-radius: 50%;
+    }
+
+    .nose {
+      position: absolute;
+      bottom: 6px;
+      width: 14px;
+      height: 10px;
+      background: #ff7a7a;
+      border: 2px solid var(--ink);
+      border-radius: 50% 50% 40% 40%;
+    }
+
+    .spark {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .spark.show {
+      animation: sparkle 0.4s ease-out;
+    }
+
+    .spark::before,
+    .spark::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-radius: 4px;
+      box-shadow: 0 0 0 2px #ffd24a inset;
+      transform: rotate(20deg);
+    }
+
+    .spark::before {
+      top: 20%;
+      left: 20%;
+    }
+
+    .spark::after {
+      bottom: 18%;
+      right: 22%;
+    }
+
+    @keyframes sparkle {
+      0% { opacity: 0; transform: scale(0.6); }
+      30% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.2); }
+    }
+
+    .summary {
+      background: #fff;
+      border: 4px dashed var(--ink);
+      border-radius: 22px;
+      padding: 14px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .summary h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      color: #ff7a00;
+      text-shadow: 2px 2px 0 #fff1d6;
+    }
+
+    .summary p {
+      margin: 4px 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .summary span {
+      color: #4e6bff;
+    }
+
+    .locked {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .game-shell {
+        padding: 18px;
+      }
+
+      .board {
+        gap: 10px;
+      }
+
+      .hole {
+        border-radius: 18px;
+      }
+
+      .button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .select-wrap {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+
+      .mole.show {
+        animation: none;
+      }
+
+      .hole.flash {
+        animation: none;
+      }
+
+      .spark.show {
+        animation: none;
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+    <h1 class="title">卡通打地鼠</h1>
+    <section class="hud">
+      <div class="hud-card">分數<span id="score">0</span></div>
+      <div class="hud-card">剩餘時間<span id="time">30</span></div>
+      <div class="hud-card">難度<span id="difficulty-label">Easy</span></div>
+    </section>
+
+    <section class="controls">
+      <button class="button" id="start-btn" type="button">開始 / 重新開始</button>
+      <label class="select-wrap">
+        難度
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+      <label class="slider-wrap">
+        速度
+        <input id="speed" type="range" min="0.7" max="1.5" step="0.1" value="1" />
+        <span id="speed-label">1.0x</span>
+      </label>
+    </section>
+
+    <section class="board" id="board"></section>
+
+    <section class="summary" id="summary">
+      <h2>結算</h2>
+      <p>本局分數：<span id="final-score">0</span></p>
+      <p>最高分：<span id="best-score">0</span></p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const board = document.getElementById("board");
+      const startBtn = document.getElementById("start-btn");
+      const scoreEl = document.getElementById("score");
+      const timeEl = document.getElementById("time");
+      const difficultySelect = document.getElementById("difficulty");
+      const difficultyLabel = document.getElementById("difficulty-label");
+      const speedInput = document.getElementById("speed");
+      const speedLabel = document.getElementById("speed-label");
+      const finalScoreEl = document.getElementById("final-score");
+      const bestScoreEl = document.getElementById("best-score");
+      const summary = document.getElementById("summary");
+
+      if (!board || !startBtn || !scoreEl || !timeEl || !difficultySelect || !difficultyLabel || !speedInput || !speedLabel || !finalScoreEl || !bestScoreEl || !summary) {
+        return;
+      }
+
+      const difficultySettings = {
+        easy: { label: "Easy", stay: 900 },
+        normal: { label: "Normal", stay: 700 },
+        hard: { label: "Hard", stay: 500 }
+      };
+
+      let score = 0;
+      let timeLeft = 30;
+      let activeIndex = null;
+      let moleTimeout = null;
+      let gameInterval = null;
+      let isPlaying = false;
+      let bestScore = 0;
+      let storageAvailable = true;
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      const safeStorage = {
+        get() {
+          try {
+            return window.localStorage.getItem("cartoonMoleBest");
+          } catch (error) {
+            storageAvailable = false;
+            return null;
+          }
+        },
+        set(value) {
+          if (!storageAvailable) {
+            return;
+          }
+          try {
+            window.localStorage.setItem("cartoonMoleBest", value);
+          } catch (error) {
+            storageAvailable = false;
+          }
+        }
+      };
+
+      const initBestScore = () => {
+        const stored = safeStorage.get();
+        if (stored !== null && !Number.isNaN(Number(stored))) {
+          bestScore = Number(stored);
+        }
+        bestScoreEl.textContent = bestScore;
+      };
+
+      const createBoard = () => {
+        board.innerHTML = "";
+        for (let i = 0; i < 9; i += 1) {
+          const hole = document.createElement("button");
+          hole.type = "button";
+          hole.className = "hole";
+          hole.dataset.index = String(i);
+
+          const mole = document.createElement("div");
+          mole.className = "mole";
+
+          const face = document.createElement("div");
+          face.className = "face";
+          const eye1 = document.createElement("span");
+          eye1.className = "eye";
+          const eye2 = document.createElement("span");
+          eye2.className = "eye";
+          const nose = document.createElement("span");
+          nose.className = "nose";
+          face.append(eye1, eye2, nose);
+
+          const spark = document.createElement("div");
+          spark.className = "spark";
+
+          mole.append(face);
+          hole.append(mole, spark);
+          board.appendChild(hole);
+        }
+      };
+
+      const clearTimers = () => {
+        if (moleTimeout) {
+          clearTimeout(moleTimeout);
+          moleTimeout = null;
+        }
+        if (gameInterval) {
+          clearInterval(gameInterval);
+          gameInterval = null;
+        }
+      };
+
+      const resetMole = () => {
+        if (activeIndex === null) return;
+        const hole = board.querySelector(`[data-index="${activeIndex}"]`);
+        if (!hole) return;
+        const mole = hole.querySelector(".mole");
+        if (mole) {
+          mole.classList.remove("show");
+        }
+        activeIndex = null;
+      };
+
+      const playBeep = (frequency, duration = 0.12) => {
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume().catch(() => {});
+        }
+        const oscillator = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        oscillator.type = "square";
+        oscillator.frequency.value = frequency;
+        gain.gain.value = 0.15;
+        oscillator.connect(gain);
+        gain.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + duration);
+      };
+
+      const endGame = () => {
+        isPlaying = false;
+        clearTimers();
+        resetMole();
+        finalScoreEl.textContent = score;
+        if (score > bestScore) {
+          bestScore = score;
+          safeStorage.set(String(bestScore));
+          bestScoreEl.textContent = bestScore;
+        }
+        summary.classList.remove("locked");
+        board.classList.add("locked");
+        playBeep(220, 0.18);
+        setTimeout(() => playBeep(180, 0.2), 200);
+      };
+
+      const updateHud = () => {
+        scoreEl.textContent = score;
+        timeEl.textContent = timeLeft;
+        const current = difficultySettings[difficultySelect.value];
+        difficultyLabel.textContent = current.label;
+        speedLabel.textContent = `${Number(speedInput.value).toFixed(1)}x`;
+      };
+
+      const scheduleMole = () => {
+        resetMole();
+        if (!isPlaying) return;
+        const nextIndex = Math.floor(Math.random() * 9);
+        activeIndex = nextIndex;
+        const hole = board.querySelector(`[data-index="${nextIndex}"]`);
+        if (!hole) return;
+        const mole = hole.querySelector(".mole");
+        if (!mole) return;
+        mole.classList.add("show");
+
+        const speedMultiplier = Number(speedInput.value) || 1;
+        const stayDuration = Math.round(difficultySettings[difficultySelect.value].stay / speedMultiplier);
+        moleTimeout = setTimeout(() => {
+          resetMole();
+          if (isPlaying) {
+            scheduleMole();
+          }
+        }, stayDuration);
+      };
+
+      const startGame = () => {
+        clearTimers();
+        resetMole();
+        score = 0;
+        timeLeft = 30;
+        isPlaying = true;
+        summary.classList.add("locked");
+        board.classList.remove("locked");
+        updateHud();
+        scheduleMole();
+        gameInterval = setInterval(() => {
+          timeLeft -= 1;
+          updateHud();
+          if (timeLeft <= 0) {
+            timeLeft = 0;
+            updateHud();
+            endGame();
+          }
+        }, 1000);
+      };
+
+      board.addEventListener("click", (event) => {
+        if (!isPlaying) return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const hole = target.closest(".hole");
+        if (!hole) return;
+        const index = hole.dataset.index;
+        if (index === null || index === undefined) return;
+        if (Number(index) === activeIndex) {
+          score += 1;
+          updateHud();
+          playBeep(660, 0.1);
+          hole.classList.add("flash");
+          const spark = hole.querySelector(".spark");
+          if (spark) {
+            spark.classList.remove("show");
+            void spark.offsetWidth;
+            spark.classList.add("show");
+          }
+          resetMole();
+          scheduleMole();
+        }
+      });
+
+      board.addEventListener("animationend", (event) => {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.classList.contains("hole")) {
+          target.classList.remove("flash");
+        }
+        if (target instanceof HTMLElement && target.classList.contains("spark")) {
+          target.classList.remove("show");
+        }
+      });
+
+      difficultySelect.addEventListener("change", () => {
+        updateHud();
+        if (isPlaying) {
+          clearTimeout(moleTimeout);
+          moleTimeout = null;
+          scheduleMole();
+        }
+      });
+
+      speedInput.addEventListener("input", () => {
+        updateHud();
+        if (isPlaying) {
+          clearTimeout(moleTimeout);
+          moleTimeout = null;
+          scheduleMole();
+        }
+      });
+
+      startBtn.addEventListener("click", () => {
+        startGame();
+      });
+
+      createBoard();
+      initBestScore();
+      updateHud();
+      summary.classList.add("locked");
+    })();
+  </script>
+</body>
+</html>
